@@ -11,11 +11,13 @@ public struct Bubble
 
     public Color color;
     public State state;
+    public bool highlight;
 
     public Bubble(Color _color)
     {
         color = _color;
         state = State.Alive;
+        highlight = false;
     }
 }
 
@@ -71,7 +73,10 @@ namespace BubblePopper
             for (int x = 0; x < COLS; ++x)
                 for (int y = 0; y < ROWS; ++y)
                 {
-                    if (Bubbles[x, y].state == Bubble.State.Alive)
+                    if (Bubbles[x, y].highlight)
+                        _canvas.AddEllipse(x * BUBBLESIZE, y * BUBBLESIZE + OFFSET, BUBBLESIZE, BUBBLESIZE,
+                            Color.Pink);
+                    else if (Bubbles[x, y].state == Bubble.State.Alive)
                     {
                         _canvas.AddEllipse(x * BUBBLESIZE, y * BUBBLESIZE + OFFSET, BUBBLESIZE, BUBBLESIZE,
                             Bubbles[x, y].color);
@@ -80,7 +85,7 @@ namespace BubblePopper
         }
 
         // Main game processing function - picks the next mouse click
-        public int Pick()
+        private int Pick()
         {
             int bubblesPopped = 0;
             int score = 0;
@@ -95,9 +100,6 @@ namespace BubblePopper
             int x = position.X / BUBBLESIZE;
             int y = (position.Y - OFFSET) / BUBBLESIZE;
 
-            if (Bubbles[x, y].state == Bubble.State.Dead)
-                Console.Beep(1000,100);
-
             // Check to ensure at least one neighbouring cell of the same color is alive
             if (!MultipleSameColorBubble(x, y, Bubbles[x, y].color))
                 return 0;
@@ -108,6 +110,54 @@ namespace BubblePopper
             StepDown();
             ShiftLeft();
             return score;
+        }
+
+        // Get mouse position and highlight potential matches 
+        private void Highlight()
+        {
+            // Clear previous highlight
+            for (int y = 0; y < ROWS; ++y)
+                for (int x = 0; x < COLS; ++x)
+                    Bubbles[x, y].highlight = false;
+
+            _canvas.GetLastMousePosition(out Point position);
+
+            int xPos = position.X / BUBBLESIZE;
+            int yPos = (position.Y - OFFSET) / BUBBLESIZE;
+
+            if (xPos < 0 || xPos > WIDTH || yPos < 0 || yPos > HEIGHT)
+                return;
+
+            if (!MultipleSameColorBubble(xPos, yPos, Bubbles[xPos, yPos].color))
+                return;
+
+            HighlightBubbles(xPos, yPos, Bubbles[xPos, yPos].color);
+        }
+
+        private void HighlightBubbles(int x, int y, Color colorIn)
+        {
+            // Conditional test to see if bubble is in bounds, alive, and the same color
+            if (x < 0 || x >= COLS || y < 0 || y >= ROWS)
+                return;
+
+            if (Bubbles[x, y].state == Bubble.State.Dead)
+                return;
+
+            if (Bubbles[x, y].color != colorIn)
+                return;
+
+            if (Bubbles[x, y].highlight)
+                return;
+
+            Bubbles[x, y].highlight = true;
+
+            // Recursive call to neighbouring cells
+            HighlightBubbles(x - 1, y, colorIn);
+            HighlightBubbles(x + 1, y, colorIn);
+            HighlightBubbles(x, y - 1, colorIn);
+            HighlightBubbles(x, y + 1, colorIn);
+
+            return;
         }
 
         // Checks to see if a neighbouring live bubble is of the same color
@@ -283,6 +333,7 @@ namespace BubblePopper
             else 
             {
                 _score += Pick();
+                Highlight();
                 Display();
                 UI_TB_Score.Text = _score.ToString();
             }
